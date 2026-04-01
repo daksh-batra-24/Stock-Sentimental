@@ -3,30 +3,19 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from backend.app.config import settings
 
-# -------------------------------
-# PostgreSQL connection settings
-# -------------------------------
-DB_USER = "stockuser"
-DB_PASSWORD = "yourpassword"  # replace with your actual password
-DB_HOST = "localhost"
-DB_PORT = "5432"
-DB_NAME = "stockdb"
+DATABASE_URL = settings.DB_URL  # defaults to "sqlite:///./app.db" if not set in .env
 
-DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-
-# -------------------------------
-# SQLAlchemy engine & session
-# -------------------------------
-engine = create_engine(DATABASE_URL, echo=True)  # echo=True for SQL logging
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+    echo=False,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Base class for models
 Base = declarative_base()
 
-# -------------------------------
-# Dependency for FastAPI
-# -------------------------------
 def get_db():
     db = SessionLocal()
     try:

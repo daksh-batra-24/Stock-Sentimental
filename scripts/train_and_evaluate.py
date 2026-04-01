@@ -302,13 +302,35 @@ def run_pipeline_stacked(ticker):
 
     predicted_direction = "up" if dir_prob > 0.5 else "down"
 
+    # ── Feature importances (top 10, exclude zero-importance sentiment) ──
+    feat_pairs = sorted(zip(feature_cols, clf.feature_importances_), key=lambda x: x[1], reverse=True)
+    top_features = [
+        {"feature": k, "importance": round(float(v), 4)}
+        for k, v in feat_pairs[:10] if v > 0
+    ]
+
+    # ── Confidence interval from regression residuals ──
+    residuals = y_test_price.values - price_pred
+    price_std = float(np.std(residuals))
+    bull_price = round(next_price + price_std, 2)
+    bear_price = round(next_price - price_std, 2)
+
+    # ── Model version ──
+    import datetime as _dt
+    model_version = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+
     return {
         "ticker": ticker,
         "best_model": "stacked",
         "predicted_price": next_price,
         "predicted_direction": predicted_direction,
         "direction_metrics": dir_metrics,
-        "price_metrics": price_metrics
+        "price_metrics": price_metrics,
+        "feature_importances": top_features,
+        "price_std": price_std,
+        "bull_price": bull_price,
+        "bear_price": bear_price,
+        "model_version": model_version,
     }
 if __name__ == "__main__":
     import argparse

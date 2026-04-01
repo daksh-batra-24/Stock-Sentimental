@@ -39,6 +39,9 @@ class PredictionResult(Base):
     # Predicted direction (up/down)
     predicted_direction = Column(String)
 
+    # Model version (timestamp string e.g. "20240101_120000")
+    model_version = Column(String, nullable=True)
+
     # Optional JSON field to store full metrics dictionary
     metrics_json = Column(JSON)
 

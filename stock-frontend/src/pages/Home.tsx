@@ -18,13 +18,11 @@ const Home: React.FC = () => {
 
   const normalizePrediction = (pred: any): PredictionResultType => ({
     ...pred,
-    direction_accuracy: pred.direction_accuracy ?? pred.metrics?.random_forest?.accuracy ?? 0,
-    direction_precision: pred.direction_precision ?? pred.metrics?.random_forest?.precision ?? 0,
-    direction_recall: pred.direction_recall ?? pred.metrics?.random_forest?.recall ?? 0,
-    direction_f1: pred.direction_f1 ?? pred.metrics?.random_forest?.f1 ?? 0,
-    price_rmse: pred.price_rmse ?? pred.metrics?.random_forest?.RMSE ?? 0,
-    price_mae: pred.price_mae ?? pred.metrics?.random_forest?.MAE ?? 0,
-    price_r2: pred.price_r2 ?? pred.metrics?.random_forest?.R2 ?? 0,
+    best_model: pred.best_model ?? pred.model,
+    price_mae:  pred.price_mae  ?? pred.metrics?.price?.MAE,
+    price_rmse: pred.price_rmse ?? pred.metrics?.price?.RMSE,
+    price_r2:   pred.price_r2   ?? pred.metrics?.price?.R2,
+    dir_metrics: pred.dir_metrics ?? pred.metrics?.direction,
   });
 
   const handlePredictionFetched = async (pred: any) => {

@@ -1,54 +1,44 @@
 # backend/app/routers/sentiment.py
 
 from fastapi import APIRouter, HTTPException
-import torch
-from transformers import AutoTokenizer, AutoModel
 import feedparser
 import numpy as np
 
-router = APIRouter(
-    prefix="/sentiment",
-    tags=["Sentiment"]
-)
+router = APIRouter(prefix="/sentiment", tags=["Sentiment"])
 
-# ---------------- BERT for sentiment ----------------
-tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
-bert_model = AutoModel.from_pretrained("distilbert-base-uncased")
-bert_model.eval()
 
-def get_bert_sentiment_features(texts, max_len=32):
-    """
-    Compute mean CLS token embedding for a list of texts.
-    """
-    all_embeddings = []
-    with torch.no_grad():
-        for text in texts:
-            inputs = tokenizer(text, return_tensors="pt", truncation=True,
-                               padding="max_length", max_length=max_len)
-            outputs = bert_model(**inputs)
-            cls_emb = outputs.last_hidden_state[:,0,:]
-            all_embeddings.append(cls_emb.numpy().squeeze())
-    if all_embeddings:
-        return np.mean(all_embeddings, axis=0).tolist()
-    return np.zeros(768).tolist()
+def _vader():
+    from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+    return SentimentIntensityAnalyzer()
 
 
 @router.get("/{ticker}")
 async def compute_sentiment(ticker: str, count: int = 10):
-    """
-    Fetch latest news headlines for the ticker and compute BERT embeddings as sentiment features.
-    """
     try:
-        rss_url = f"https://news.google.com/rss/search?q={ticker}+stock&hl=en-IN&gl=IN&ceid=IN:en"
+        rss_url = (
+            f"https://news.google.com/rss/search"
+            f"?q={ticker}+stock&hl=en-IN&gl=IN&ceid=IN:en"
+        )
         feed = feedparser.parse(rss_url)
-        titles = [entry.title for entry in feed.entries[:count]]
+        entries = feed.entries[:count]
 
-        sentiment_features = get_bert_sentiment_features(titles)
+        analyzer = _vader()
+        headlines = []
+        scores = []
+        for entry in entries:
+            title = entry.get("title", "")
+            score = analyzer.polarity_scores(title)["compound"]
+            scores.append(score)
+            headlines.append({"title": title, "score": round(score, 3)})
+
+        avg_score = round(float(np.mean(scores)), 3) if scores else 0.0
+        label = "Positive" if avg_score > 0.05 else "Negative" if avg_score < -0.05 else "Neutral"
 
         return {
-            "status": "success",
-            "ticker": ticker,
-            "sentiment_features": sentiment_features
+            "ticker": ticker.upper(),
+            "sentiment_score": avg_score,
+            "sentiment_label": label,
+            "headlines": headlines,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

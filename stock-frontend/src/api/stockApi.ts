@@ -1,5 +1,7 @@
 import axios from "axios";
 
+export const BASE_URL = "http://localhost:8000";
+
 // ---------- Static ticker list ----------
 export const getAllTickers = (): string[] => [
   "AAPL","MSFT","GOOGL","AMZN","TSLA","META","NVDA","JPM","V","JNJ",
@@ -9,56 +11,103 @@ export const getAllTickers = (): string[] => [
   "TXN","NEE","UNH","HON","DHR","LIN","AMGN","BMY","SBUX","TMUS"
 ];
 
-// ---------- Prediction Result Type ----------
-// ---------- Prediction Result Type ----------
+// ---------- Types ----------
+export interface FeatureImportance {
+  feature: string;
+  importance: number;
+}
+
+export interface SentimentHeadline {
+  title: string;
+  score: number;
+}
+
+export interface SentimentData {
+  ticker: string;
+  sentiment_score: number;
+  sentiment_label: "Positive" | "Negative" | "Neutral";
+  headlines: SentimentHeadline[];
+}
+
+export interface AccuracyRecord {
+  date: string;
+  predicted_price: number;
+  actual_price: number;
+  predicted_direction: string;
+  actual_direction: string;
+  correct: boolean;
+}
+
+export interface AccuracyData {
+  ticker: string;
+  total: number;
+  correct: number;
+  accuracy: number | null;
+  records: AccuracyRecord[];
+}
+
+export interface HeatmapEntry {
+  ticker: string;
+  direction: "up" | "down" | null;
+  price: number | null;
+}
+
 export interface PredictionResult {
   id?: number;
   ticker: string;
   best_model: string;
+  model_version?: string;
   predicted_price: number;
   predicted_direction: string;
+  bull_price?: number;
+  bear_price?: number;
+  price_std?: number;
   created_at?: string;
 
-  // Price metrics (legacy)
+  // Flat metrics (set by normalizePrediction)
   price_mae?: number;
   price_rmse?: number;
   price_r2?: number;
 
-  // ✅ Direction + Price metrics from backend
+  // Raw metrics from backend
   metrics?: {
-    random_forest?: { RMSE: number; MAE: number; R2: number };
-    lstm?: { RMSE: number; MAE: number; R2: number };
+    price?: { MAE: number; RMSE: number; R2: number };
+    direction?: { accuracy: number; precision: number; recall: number; f1: number };
   };
 
+  // Direction metrics (set by normalizePrediction)
   dir_metrics?: {
     accuracy?: number;
     precision?: number;
     recall?: number;
     f1?: number;
   };
+
+  feature_importances?: FeatureImportance[];
 }
 
-
-const BASE_URL = "http://localhost:8000";
-
-// ---------- Fetch prediction ----------
+// ---------- API calls ----------
 export const fetchPrediction = async (ticker: string): Promise<PredictionResult> => {
-  try {
-    const response = await axios.get(`${BASE_URL}/predict/${ticker}`);
-    return response.data as PredictionResult;
-  } catch (err: any) {
-    console.error("Error fetching prediction:", err);
-    throw new Error(err.response?.data?.detail || "Failed to fetch prediction");
-  }
+  const res = await axios.get(`${BASE_URL}/predict/${ticker}`);
+  return res.data as PredictionResult;
 };
 
-// ---------- Fetch prediction history ----------
 export const fetchPredictionHistory = async (ticker: string): Promise<PredictionResult[]> => {
-  try {
-    const response = await axios.get(`${BASE_URL}/predict/history/${ticker}`);
-    return response.data.records as PredictionResult[];
-  } catch (err: any) {
-    console.error("Error fetching prediction history:", err);
-    throw new Error(err.response?.data?.detail || "Failed to fetch prediction history");
-  }
+  const res = await axios.get(`${BASE_URL}/predict/history/${ticker}`);
+  return res.data.records as PredictionResult[];
+};
+
+export const fetchSentiment = async (ticker: string): Promise<SentimentData> => {
+  const res = await axios.get(`${BASE_URL}/sentiment/${ticker}`);
+  return res.data as SentimentData;
+};
+
+export const fetchAccuracy = async (ticker: string): Promise<AccuracyData> => {
+  const res = await axios.get(`${BASE_URL}/predict/accuracy/${ticker}`);
+  return res.data as AccuracyData;
+};
+
+export const fetchHeatmap = async (): Promise<HeatmapEntry[]> => {
+  const res = await axios.get(`${BASE_URL}/predict/heatmap`);
+  return res.data.data as HeatmapEntry[];
 };

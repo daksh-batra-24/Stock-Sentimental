@@ -3,61 +3,35 @@
 from fastapi import APIRouter, HTTPException
 import yfinance as yf
 import pandas as pd
-import feedparser
-from backend.app.routers.sentiment import get_bert_sentiment_features
-from backend.app.config import settings
-import requests
-import pandas as pd
+import datetime
+
 router = APIRouter(
     prefix="/fetch",
     tags=["FetchData"]
 )
 
 @router.get("/{ticker}")
-
-
-
-def fetch_stock_data(ticker: str, years=2):
-    url = "https://finnhub.io/api/v1/stock/candle"
-
-    params = {
-        "symbol": ticker,
-        "resolution": "D",
-        "count": 500,
-        "token": settings.FINNHUB_API_KEY  # ✅ from .env
-    }
-
-    response = requests.get(url, params=params)
-    data = response.json()
-
-    if data.get("s") != "ok":
-        raise Exception(f"Finnhub error: {data}")
-
-    df = pd.DataFrame({
-        "Date": pd.to_datetime(data["t"], unit="s"),
-        "Open": data["o"],
-        "High": data["h"],
-        "Low": data["l"],
-        "Close": data["c"],
-        "Volume": data["v"]
-    })
-
-    return df
-async def fetch_news(ticker: str, count: int = 10):
-    """
-    Fetch latest news headlines for a ticker using Google News RSS feed.
-    """
+def fetch_stock_data(ticker: str, days: int = 180):
     try:
-        rss_url = f"https://news.google.com/rss/search?q={ticker}+stock&hl=en-IN&gl=IN&ceid=IN:en"
-        feed = feedparser.parse(rss_url)
-        entries = feed.entries[:count]
+        end = datetime.date.today()
+        start = end - datetime.timedelta(days=days)
+        df = yf.download(ticker, start=start, end=end, progress=False)
 
-        news = [{"title": entry.title, "link": entry.link, "published": entry.published} for entry in entries]
+        if df.empty:
+            raise HTTPException(status_code=404, detail=f"No data found for ticker: {ticker}")
 
-        return {
-            "status": "success",
-            "ticker": ticker,
-            "news": news
-        }
+        df.reset_index(inplace=True)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = [col[0] for col in df.columns]
+
+        df["Date"] = df["Date"].astype(str)
+        records = df[["Date", "Close"]].rename(
+            columns={"Date": "date", "Close": "close"}
+        ).to_dict(orient="records")
+
+        return {"ticker": ticker.upper(), "data": records}
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
